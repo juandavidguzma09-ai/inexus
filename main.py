@@ -23,7 +23,6 @@ RAID_ICON_URL = "https://tenor.com/view/mmt-error-error-old-data-fatal-error-ins
 # --- CUSTOM EMOJIS FOR HELP COMMAND ---
 EMOJI_LOCKED = "<:BackgroundEraser_20260106_164604:1458215277270405201>"
 EMOJI_UNLOCKED = "<:BackgroundEraser_20260106_164433:1458214866002378752>"
-EMOJI_VERIFIED = "<:BackgroundEraser_20260106_164323:1458214597571117264>"
 EMOJI_GEAR = "<:BackgroundEraser_20260106_163940:1458213801106346076>"
 
 # Bot setup
@@ -58,7 +57,7 @@ async def custom_help(ctx):
     await ctx.message.delete()
 
     embed = discord.Embed(
-        title=f"Bot Command Manual {EMOJI_VERIFIED}",
+        title=f"Bot Command Manual",
         description="This bot provides both public and premium raiding capabilities.",
         color=discord.Color.from_rgb(47, 49, 54)
     )
