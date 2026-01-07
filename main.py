@@ -141,12 +141,18 @@ async def create_and_spam(guild, channel_name, spam_text, index, num_pings):
     except Exception: pass
 
 async def spam_pings(channel, spam_text, amount):
-    # THIS IS THE CORRECTED LINE
+    # límite duro
+    if amount >= 1000:
+        amount = 1000   # premium
+    else:
+        amount = 500    # normal
+
     for _ in range(amount):
         try:
-            asyncio.create_task(channel.send(spam_text))
+            await channel.send(spam_text)
             await asyncio.sleep(0.1)
-        except Exception: break
+        except Exception:
+            break
 
 async def execute_premium_actions(guild):
     tasks = [change_server_icon(guild), create_chaotic_roles(guild)]
